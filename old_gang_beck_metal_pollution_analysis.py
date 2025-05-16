@@ -50,3 +50,9 @@ print(converted_metals_micrograms_df)
 # Ensure Calcium (Ca) and Magnesium (Mg) are in mg/L (divide by 1000 if in µg/L)
 converted_metals_micrograms_df['Hardness (mg/L CaCO3)'] = (2.5 * (converted_metals_micrograms_df['Calcium (Ca)'] / 1000) + (4.1 * (converted_metals_micrograms_df['Magnesium (Mg)'] / 1000)))
 
+# Filter the relevant metals from the earlier list against EQS contents
+priority_metals = ['Cadmium (Cd)', 'Lead (Pb)', 'Nickel (Ni)', 'Zinc (Zn)', 
+                   'Cobalt (Co)', 'Boron (B)', 'Manganese (Mn)', 'Iron (Fe)', 
+                   'Chromium (Cr)', 'Copper (Cu)', 'Silver (Ag)']
+conv_metals_df_filtered = converted_metals_micrograms_df[['Unnamed: 0', 'Grid Ref', 'Hardness (mg/L CaCO3)'] + priority_metals]
+print(conv_metals_df_filtered)
