@@ -138,33 +138,33 @@ for metal_col in summary_df.columns:
 # Load hardness-mapped Cadmium EQS (from previous steps)
 # Assuming you have a column 'Hardness (mg/L CaCO3)' in summary_df
 
-#cadmium_results = []
-#for _, row in summary_df.iterrows():
-#    site = row['Site']
-#    hardness = row['Hardness (mg/L CaCO3)']
-#    mean_cd = row['Cadmium (Cd)_mean']
+cadmium_results = []
+for _, row in summary_df.iterrows():
+    site = row['Site']
+    hardness = row['Hardness (mg/L CaCO3)_mean']
+    mean_cd = row['Cadmium (Cd)_mean']
     
     # Determine EQS based on hardness
-#    if hardness < 40:
-#        eqs_data = eqs_priority[eqs_priority['Chemical'] == 'Cadmium water hardness less than 40 milligrams'].iloc[0]
-#    elif 40 <= hardness < 50:
-#        eqs_data = eqs_priority[eqs_priority['Chemical'] == 'Cadmium water hardness 40mg to less than 50mg'].iloc[0]
-#    elif 50 <= hardness < 100:
-#        eqs_data = eqs_priority[eqs_priority['Chemical'] == 'Cadmium water hardness 50mg to less than 100mg'].iloc[0]
-#    elif 100 <= hardness < 200:
-#        eqs_data = eqs_priority[eqs_priority['Chemical'] == 'Cadmium water hardness 100mg to less than 200mg'].iloc[0]
-#    else:
-#        eqs_data = eqs_priority[eqs_priority['Chemical'] == 'Cadmium water hardness 200mg or more'].iloc[0]
+    if hardness < 40:
+        eqs_data = eqs_priority[eqs_priority['Chemical'] == 'Cadmium water hardness less than 40 milligrams'].iloc[0]
+    elif 40 <= hardness < 50:
+        eqs_data = eqs_priority[eqs_priority['Chemical'] == 'Cadmium water hardness 40mg to less than 50mg'].iloc[0]
+    elif 50 <= hardness < 100:
+        eqs_data = eqs_priority[eqs_priority['Chemical'] == 'Cadmium water hardness 50mg to less than 100mg'].iloc[0]
+    elif 100 <= hardness < 200:
+        eqs_data = eqs_priority[eqs_priority['Chemical'] == 'Cadmium water hardness 100mg to less than 200mg'].iloc[0]
+    else:
+        eqs_data = eqs_priority[eqs_priority['Chemical'] == 'Cadmium water hardness 200mg or more'].iloc[0]
     
     # Compare
-#    cadmium_results.append({
-#        'Site': site,
-#        'Metal': 'Cadmium (Cd)',
-#        'Mean Concentration (µg/L)': mean_cd,
-#        'Threshold Type': 'AA-EQS',  # All Cadmium EQS entries have AA-EQS
-#        'Threshold (µg/L)': eqs_data['AA-EQS (micrograms per litre)'],
-#        'Exceedance': mean_cd > eqs_data['AA-EQS (micrograms per litre)']
-#    })
+    cadmium_results.append({
+        'Site': site,
+        'Metal': 'Cadmium (Cd)',
+        'Mean Concentration (µg/L)': mean_cd,
+        'Threshold Type': 'AA-EQS',  # All Cadmium EQS entries have AA-EQS
+        'Threshold (µg/L)': eqs_data['AA-EQS (micrograms per litre)'],
+        'Exceedance': mean_cd > eqs_data['AA-EQS (micrograms per litre)']
+    })
 
 # Convert to DataFrames
 main_results_df = pd.DataFrame(results)
