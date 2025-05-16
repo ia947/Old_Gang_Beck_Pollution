@@ -20,47 +20,54 @@ from matplotlib.colors import LinearSegmentedColormap, BoundaryNorm
 ###### DATA LOADING & PREP #####
 ###############################
 
-def load_and_process_metal_data():
-    """Load and preprocess all required datasets"""
+def load_and_process_metal_data(path="Old_Gang_beck_raw_data_2025.xlsx"):
+    """Load raw data, convert metals to µg/L, and compute site‐level summary stats."""
     # Load main data
-    ogb_raw_df = pd.read_excel("OGB_raw_no_repeat.xlsx")
+    ogb_raw_metal_df = pd.read_excel(path)
     
-    # Identify metal columns (columns G to AC in the original data)
-    metal_columns = ogb_raw_df.columns[6:29]
+    # Identify metal columns
+    priority_metals = [
+        'Cadmium (Cd)', 'Lead (Pb)', 'Nickel (Ni)', 'Zinc (Zn)',
+        'Cobalt (Co)', 'Boron (B)', 'Manganese (Mn)', 'Iron (Fe)',
+        'Chromium (Cr)', 'Copper (Cu)', 'Silver (Ag)'
+    ]
     
-    # Convert metal values from mg/L to µg/L
-    ogb_raw_df[metal_columns] = ogb_raw_df[metal_columns] * 1000
+    # ensure they actually exist
+    metal_cols = [m for m in priority_metals if m in ogb_raw_metal_df.columns]
+    if len(metal_cols) < len(priority_metals):
+        missing = set(priority_metals) - set(metal_cols)
+        raise KeyError(f"Missing expected metal columns: {missing}")
     
-    # Save the results (optional)
-    ogb_raw_df.to_csv("converted_metals_micrograms.csv", index=False)
+    # Convert mg/L → µg/L
+    ogb_raw_metal_df[metal_cols] = ogb_raw_metal_df[metal_cols] * 1000
     
-    # Show confirmation
-    print("Conversion complete. Columns converted:")
-    print(list(metal_columns))
+    # Derive a clean site name by stripping anything after 'repeat'
+    ogb_raw_metal_df['Site'] = ogb_raw_metal_df['Label'].str.replace(r'\s*repeat.*$', '', regex=True)
     
+    # Compute summary statistics (mean & SEM) per site
+    summary = (
+        ogb_raw_metal_df
+        .groupby('Site')[metal_cols]
+        .agg(['mean', 'sem'])
+        .reset_index()
+    )
+    # flatten MultiIndex columns
+    summary.columns = [
+        'Site'
+    ] + [
+        f"{metal}_{stat}" 
+        for metal, stat in summary.columns.tolist()[1:]
+    ]
     
-    return ogb_raw_df
+    # Save processed data and summary
+    ogb_raw_metal_df.to_csv("converted_metals_micrograms.csv", index=False)
+    summary.to_csv("summary_statistics_by_site.csv", index=False)
+    
+    return ogb_raw_metal_df, summary
 
-# Load converted metal concentration dataframe
-converted_metals_micrograms_df = pd.read_csv("converted_metals_micrograms.csv")
-print(converted_metals_micrograms_df)
-
-# Calculate water hardness in mg/L of CaCO3
-# Formula: Water Hardness = 2.5 * [Ca] + 4.1 * [Mg]
-# Ensure Calcium (Ca) and Magnesium (Mg) are in mg/L (divide by 1000 if in µg/L)
-converted_metals_micrograms_df['Hardness (mg/L CaCO3)'] = (2.5 * (converted_metals_micrograms_df['Calcium (Ca)'] / 1000) + (4.1 * (converted_metals_micrograms_df['Magnesium (Mg)'] / 1000)))
-
-# Filter the relevant metals from the earlier list against EQS contents
-priority_metals = ['Cadmium (Cd)', 'Lead (Pb)', 'Nickel (Ni)', 'Zinc (Zn)', 
-                   'Cobalt (Co)', 'Boron (B)', 'Manganese (Mn)', 'Iron (Fe)', 
-                   'Chromium (Cr)', 'Copper (Cu)', 'Silver (Ag)']
-conv_metals_df_filtered = converted_metals_micrograms_df[['Unnamed: 0', 'Hardness (mg/L CaCO3)'] + priority_metals]
-print(conv_metals_df_filtered)
-
-# Calculate mean and standard error
-# Group by sampling location
-summary_conv_metals = conv_metals_df_filtered.groupby('Unnamed: 0').agg(['mean', 'sem']).reset_index()
-summary_conv_metals.columns = ['Unnamed: 0'] + [f'{col}_{stat}' for col, stat in summary_conv_metals.columns[1:]]
-
-# Save results
-summary_conv_metals.to_csv('summary_statistics.csv', index=False)
+if __name__ == "__main__":
+    processed_df, summary_df = load_and_process_metal_data()
+    print("Processed data head:")
+    print(processed_df.head())
+    print("\nSummary statistics head:")
+    print(summary_df.head())
