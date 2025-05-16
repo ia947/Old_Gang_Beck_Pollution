@@ -168,11 +168,11 @@ for _, row in summary_df.iterrows():
 
 # Convert to DataFrames
 main_results_df = pd.DataFrame(results)
-#cadmium_df = pd.DataFrame(cadmium_results)
+cadmium_df = pd.DataFrame(cadmium_results)
 
 # Combine and save
-#final_results = pd.concat([main_results_df, cadmium_df], ignore_index=True)
-final_results = pd.concat([main_results_df], ignore_index=True)
+final_results = pd.concat([main_results_df, cadmium_df], ignore_index=True)
+#final_results = pd.concat([main_results_df], ignore_index=True)
 final_results.to_csv('eqs_exceedance_report.csv', index=False)
 
 # Print summary
