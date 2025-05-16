@@ -32,7 +32,7 @@ def load_and_process_metal_data():
     ogb_raw_df[metal_columns] = ogb_raw_df[metal_columns] * 1000
     
     # Save the results (optional)
-    ogb_raw_df.to_csv('converted_metals_micrograms.csv', index=False)
+    ogb_raw_df.to_csv("converted_metals_micrograms.csv", index=False)
     
     # Show confirmation
     print("Conversion complete. Columns converted:")
@@ -40,3 +40,13 @@ def load_and_process_metal_data():
     
     
     return ogb_raw_df
+
+# Load converted metal concentration dataframe
+converted_metals_micrograms_df = pd.read_csv("converted_metals_micrograms.csv")
+print(converted_metals_micrograms_df)
+
+# Calculate water hardness in mg/L of CaCO3
+# Formula: Water Hardness = 2.5 * [Ca] + 4.1 * [Mg]
+# Ensure Calcium (Ca) and Magnesium (Mg) are in mg/L (divide by 1000 if in µg/L)
+converted_metals_micrograms_df['Hardness (mg/L CaCO3)'] = (2.5 * (converted_metals_micrograms_df['Calcium (Ca)'] / 1000) + (4.1 * (converted_metals_micrograms_df['Magnesium (Mg)'] / 1000)))
+
