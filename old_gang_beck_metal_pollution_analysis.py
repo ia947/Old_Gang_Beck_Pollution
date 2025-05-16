@@ -15,6 +15,7 @@ from SALib.sample import saltelli
 from SALib.analyze import sobol
 from tabulate import tabulate
 from matplotlib.colors import LinearSegmentedColormap, BoundaryNorm
+from matplotlib.colors import ListedColormap
 
 ###############################
 ###### DATA LOADING & PREP #####
@@ -180,26 +181,90 @@ print("\n=== Exceedance Summary ===")
 print(final_results[['Site', 'Metal', 'Exceedance']].groupby(['Site', 'Metal']).max().unstack())
 
 
-# Load exceedance report
-exceedance_df = pd.read_csv("eqs_exceedance_report.csv")
+############################################
 
-# Count exceedances per metal and site
-exceedance_summary = (
-    exceedance_df.groupby(['Site', 'Metal'])['Exceedance']
-    .max()
-    .unstack()
-    .fillna(False)
-)
+# Ensure output directory exists
+OUTPUT_DIR = "figures"
+os.makedirs(OUTPUT_DIR, exist_ok=True)
 
-# Plotting exceedance
-plt.figure(figsize=(12, 8))
-sns.set_theme(style="whitegrid", palette="viridis")
-exceedance_summary.T.plot(kind='barh', stacked=True, edgecolor='black', linewidth=0.5)
-plt.title('EQS Exceedances by Site and Metal', fontsize=14, fontweight='bold')
-plt.xlabel('Site', fontsize=12)
-plt.ylabel('Metal', fontsize=12)
-plt.legend(bbox_to_anchor=(1.05, 1), loc='upper left', title='Site')
-plt.tight_layout()
-plt.savefig('exceedance_summary.png', dpi=300, bbox_inches='tight')
+# Load data
+summary_df = pd.read_csv("summary_statistics_by_site.csv")
+results_df = pd.read_csv("eqs_exceedance_report.csv")
+
+# Bar plots with error bars and thresholds
+def plot_metal_barplots(summary_df, results_df, output_dir=OUTPUT_DIR):
+    metals = sorted(results_df['Metal'].unique())
+    for metal in metals:
+        # Identify mean and SEM columns
+        mean_col = next((c for c in summary_df.columns if c.startswith(metal) and c.endswith('_mean')), None)
+        sem_col = next((c for c in summary_df.columns if c.startswith(metal) and c.endswith('_sem')), None)
+        if not mean_col or not sem_col:
+            continue
+        df_m = summary_df[['Site', mean_col, sem_col]].copy()
+        # Build threshold and exceedance dicts
+        thr_df = results_df[results_df['Metal'] == metal].drop_duplicates('Site')[['Site', 'Threshold (µg/L)', 'Exceedance']]
+        df_m = df_m.merge(thr_df, on='Site', how='left')
+        # Plot
+        fig, ax = plt.subplots(figsize=(10, 6))
+        x = np.arange(len(df_m))
+        # Colours: green below EQS, red above
+        bar_colors = df_m['Exceedance'].map({False: '#2ca02c', True: '#d62728'})
+        ax.bar(x, df_m[mean_col], yerr=df_m[sem_col], capsize=5,
+               color=bar_colors, edgecolor='black')
+        # EQS threshold line in dark blue
+        ax.plot(x, df_m['Threshold (µg/L)'], linestyle='--', linewidth=2,
+                color='darkblue', label='EQS Threshold')
+        # Labels and title
+        ax.set_xticks(x)
+        ax.set_xticklabels(df_m['Site'], rotation=45, ha='right')
+        ax.set_ylabel('Concentration (µg/L)')
+        ax.set_title(f'{metal} Concentrations vs. EQS')
+        ax.legend()
+        plt.tight_layout()
+        # Save
+        fname = f"{metal.replace(' ', '_').replace('(','').replace(')','').replace('/','_')}_barplot.png"
+        fig.savefig(os.path.join(output_dir, fname), dpi=300)
+        plt.close(fig)
+
+# Heatmap of exceedances
+def plot_exceedance_heatmap(results_df, output_dir=OUTPUT_DIR):
+    # Use pivot_table to handle any duplicate site-metal entries
+    pivot = results_df.pivot_table(
+        index='Site',
+        columns='Metal',
+        values='Exceedance',
+        aggfunc='max',
+        fill_value=False
+    )
+    data = pivot.astype(int)
+    fig, ax = plt.subplots(figsize=(12, 8))
+    sns.heatmap(
+        data,
+        cmap=ListedColormap(['#ffffff', '#d73027']),
+        linewidths=0.5,
+        linecolor='gray',
+        cbar=False,
+        ax=ax
+    )
+    ax.set_title('EQS Exceedance Heatmap')
+    ax.set_xlabel('Metal')
+    ax.set_ylabel('Site')
+    plt.xticks(rotation=45, ha='right')
+    plt.tight_layout()
+    fig.savefig(os.path.join(output_dir, 'exceedance_heatmap.png'), dpi=300)
+    plt.close(fig)
 
 
+# Run all plots
+def main():
+    plot_metal_barplots(summary_df, results_df)
+    plot_exceedance_heatmap(results_df)
+
+if __name__ == '__main__':
+    main()
+def main():
+    plot_metal_barplots(summary_df, results_df)
+    plot_exceedance_heatmap(results_df)
+
+if __name__ == '__main__':
+    main()
