@@ -54,5 +54,13 @@ converted_metals_micrograms_df['Hardness (mg/L CaCO3)'] = (2.5 * (converted_meta
 priority_metals = ['Cadmium (Cd)', 'Lead (Pb)', 'Nickel (Ni)', 'Zinc (Zn)', 
                    'Cobalt (Co)', 'Boron (B)', 'Manganese (Mn)', 'Iron (Fe)', 
                    'Chromium (Cr)', 'Copper (Cu)', 'Silver (Ag)']
-conv_metals_df_filtered = converted_metals_micrograms_df[['Unnamed: 0', 'Grid Ref', 'Hardness (mg/L CaCO3)'] + priority_metals]
+conv_metals_df_filtered = converted_metals_micrograms_df[['Unnamed: 0', 'Hardness (mg/L CaCO3)'] + priority_metals]
 print(conv_metals_df_filtered)
+
+# Calculate mean and standard error
+# Group by sampling location
+summary_conv_metals = conv_metals_df_filtered.groupby('Unnamed: 0').agg(['mean', 'sem']).reset_index()
+summary_conv_metals.columns = ['Unnamed: 0'] + [f'{col}_{stat}' for col, stat in summary_conv_metals.columns[1:]]
+
+# Save results
+summary_conv_metals.to_csv('summary_statistics.csv', index=False)
