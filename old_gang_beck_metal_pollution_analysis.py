@@ -178,3 +178,28 @@ final_results.to_csv('eqs_exceedance_report.csv', index=False)
 # Print summary
 print("\n=== Exceedance Summary ===")
 print(final_results[['Site', 'Metal', 'Exceedance']].groupby(['Site', 'Metal']).max().unstack())
+
+
+# Load exceedance report
+exceedance_df = pd.read_csv("eqs_exceedance_report.csv")
+
+# Count exceedances per metal and site
+exceedance_summary = (
+    exceedance_df.groupby(['Site', 'Metal'])['Exceedance']
+    .max()
+    .unstack()
+    .fillna(False)
+)
+
+# Plotting exceedance
+plt.figure(figsize=(12, 8))
+sns.set_theme(style="whitegrid", palette="viridis")
+exceedance_summary.T.plot(kind='barh', stacked=True, edgecolor='black', linewidth=0.5)
+plt.title('EQS Exceedances by Site and Metal', fontsize=14, fontweight='bold')
+plt.xlabel('Site', fontsize=12)
+plt.ylabel('Metal', fontsize=12)
+plt.legend(bbox_to_anchor=(1.05, 1), loc='upper left', title='Site')
+plt.tight_layout()
+plt.savefig('exceedance_summary.png', dpi=300, bbox_inches='tight')
+
+
