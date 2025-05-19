@@ -1,0 +1,8 @@
+Chemical,AA-EQS (micrograms per litre),MAC-EQS (micrograms per litre)
+Lead,1.2,14
+Cadmium water hardness less than 40 milligrams,0.08,0.45
+Cadmium water hardness 40mg to less than 50mg,0.08,0.45
+Cadmium water hardness 50mg to less than 100mg,0.09,0.6
+Cadmium water hardness 100mg to less than 200mg,0.15,0.9
+Cadmium water hardness 200mg or more,0.25,1.5
+Nickel,4,34

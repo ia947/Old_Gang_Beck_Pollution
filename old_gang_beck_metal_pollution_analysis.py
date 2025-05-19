@@ -81,6 +81,20 @@ processed_df, summary_df = load_and_process_metal_data()
 # Load your summary statistics (from previous step)
 summary_df = pd.read_csv("summary_statistics_by_site.csv")
 
+# Define flow rates (L/s) for specific sites
+flow_rates = {
+    'Hard LV': 12.20,         # Hard Level
+    'SPENCE level': 1.09,     # Spence Level
+    'River Swale DS': 10400,  # River Swale
+    'River Swale US': 10400   # Assume same flow for upstream/downstream
+}
+
+# Convert to annual flow (L/year)
+annual_flow = {site: rate * 31536000 for site, rate in flow_rates.items()}  # 31,536,000 seconds/year
+
+# Add annual flow to summary_df
+summary_df['Annual Flow (L/year)'] = summary_df['Site'].map(annual_flow)
+
 # Load EQS thresholds
 eqs_specific = pd.read_csv("freshwater_specific_pollutants_EQS_filtered.csv")
 eqs_priority = pd.read_csv("freshwater_priority_hazardous_EQS_filtered.csv")
@@ -144,6 +158,14 @@ for _, row in summary_df.iterrows():
     site = row['Site']
     hardness = row['Hardness (mg/L CaCO3)_mean']
     mean_cd = row['Cadmium (Cd)_mean']
+    flow = row['Annual Flow (L/year)']
+    
+    # Skip sites without flow data (NaN)
+    if pd.isna(flow):
+        continue
+    
+    # Calculate annual load (kg/year)
+    cd_load_kg_year = (mean_cd * flow) / 1e9  # µg/L * L/year → kg/year
     
     # Determine EQS based on hardness
     if hardness < 40:
@@ -157,23 +179,23 @@ for _, row in summary_df.iterrows():
     else:
         eqs_data = eqs_priority[eqs_priority['Chemical'] == 'Cadmium water hardness 200mg or more'].iloc[0]
     
-    # Compare
+    # Compare to concentration and annual load thresholds
     cadmium_results.append({
         'Site': site,
         'Metal': 'Cadmium (Cd)',
         'Mean Concentration (µg/L)': mean_cd,
-        'Threshold Type': 'AA-EQS',  # All Cadmium EQS entries have AA-EQS
-        'Threshold (µg/L)': eqs_data['AA-EQS (micrograms per litre)'],
-        'Exceedance': mean_cd > eqs_data['AA-EQS (micrograms per litre)']
+        'Annual Load (kg/year)': cd_load_kg_year,
+        'Threshold Type': 'AA-EQS Annual Load',
+        'Threshold (kg/year)': 5,
+        'Exceedance': cd_load_kg_year > 5 or mean_cd > eqs_data['AA-EQS (micrograms per litre)']
     })
 
-# Convert to DataFrames
+# Existing concentration-based results
 main_results_df = pd.DataFrame(results)
-cadmium_df = pd.DataFrame(cadmium_results)
+cadmium_load_df = pd.DataFrame(cadmium_results)
 
 # Combine and save
-final_results = pd.concat([main_results_df, cadmium_df], ignore_index=True)
-#final_results = pd.concat([main_results_df], ignore_index=True)
+final_results = pd.concat([main_results_df, cadmium_load_df], ignore_index=True)
 final_results.to_csv('eqs_exceedance_report.csv', index=False)
 
 # Print summary
@@ -258,16 +280,140 @@ def plot_exceedance_heatmap(results_df, output_dir=OUTPUT_DIR):
     plt.close(fig)
 
 
+# Define flow rates (L/s) for key sites
+flow_rates = {
+    "Hard LV": 12.20,          # Hard Level adit
+    "SPENCE level": 1.09,       # Spence Level adit
+    "River Swale US": 10400     # River Swale upstream
+}
+
+# UK annual significant load thresholds (kg/year) for SPECIFIC METALS
+uk_annual_limits = {
+    "Cadmium (Cd)": 5,   # Match EXACTLY how Cadmium appears in your column names
+    "Lead (Pb)": 2000, 
+    "Zinc (Zn)": 2500
+}
+
+def calculate_annual_loads(summary_df, flow_rates):
+    """Calculate annual loads for sites with known flow rates."""
+    load_sites = summary_df[summary_df["Site"].isin(flow_rates.keys())].copy()
+    
+    for metal_col in load_sites.columns:
+        if "_mean" in metal_col:
+            # Extract FULL metal name from column (e.g. "Cadmium (Cd)_mean" → "Cadmium (Cd)")
+            full_metal_name = metal_col.split("_")[0]  
+            load_sites[f"{full_metal_name}_load_kg_yr"] = load_sites.apply(
+                lambda row: row[metal_col] * flow_rates[row["Site"]] * 0.031536,
+                axis=1
+            )
+    return load_sites
+
+# Generate compliance report
+compliance = []
+load_results = calculate_annual_loads(summary_df, flow_rates)
+
+for _, row in load_results.iterrows():
+    site = row["Site"]
+    for metal, limit in uk_annual_limits.items():
+        load_col = f"{metal}_load_kg_yr"  # Now matches "Cadmium (Cd)_load_kg_yr"
+        if load_col in load_results.columns:
+            load = row[load_col]
+            compliance.append({
+                "Site": site,
+                "Metal": metal,
+                "Annual Load (kg/yr)": load,
+                "UK Limit (kg/yr)": limit,
+                "Exceedance (%)": (load / limit) * 100
+            })
+
+compliance_df = pd.DataFrame(compliance)
+compliance_df.to_csv("annual_load_compliance.csv", index=False)
+
+
+def plot_annual_loads(compliance_df, output_dir="figures"):
+    plt.figure(figsize=(12, 7))
+    
+    # Pivot data for better plotting
+    plot_df = compliance_df.melt(
+        id_vars=["Site", "Metal"],
+        value_vars=["Annual Load (kg/yr)", "UK Limit (kg/yr)"],
+        var_name="Type",
+        value_name="Value"
+    )
+    
+    # Create grouped bars
+    sns.barplot(
+        data=plot_df,
+        x="Site",
+        y="Value",
+        hue="Metal",
+        palette={"Cadmium (Cd)": "#d62728", "Lead (Pb)": "#2ca02c", "Zinc (Zn)": "#ff7f0e"},
+        dodge=True  # Group bars for same metal together
+    )
+    
+    # Add threshold line and annotations
+    plt.axhline(5, color='#d62728', linestyle=':', alpha=0.5, label='Cadmium Limit')
+    plt.axhline(2000, color='#2ca02c', linestyle=':', alpha=0.5, label='Lead Limit')
+    plt.axhline(2500, color='#ff7f0e', linestyle=':', alpha=0.5, label='Zinc Limit')
+    
+    # Formatting
+    plt.yscale('log')  # Use log scale for better visibility
+    plt.ylabel("Annual Load (kg/year)")
+    plt.title("Metal Loads vs UK Regulatory Limits")
+    plt.legend(bbox_to_anchor=(1.05, 1), loc='upper left')
+    plt.tight_layout()
+    plt.savefig(f"{output_dir}/annual_load_comparison.png", dpi=300)
+    plt.close()
+plot_annual_loads(compliance_df)
+
+
+def plot_ph_vs_sulfate(processed_df, output_dir="figures"):
+    """Scatter plot of pH vs. sulfate to show NMD relationships."""
+    plt.figure(figsize=(10, 6))
+    
+    # Handle NaN values in 'Site' and convert to string
+    processed_df['Site'] = processed_df['Site'].fillna('Unknown').astype(str)
+    
+    # Extract data
+    x = processed_df['pH']
+    y = processed_df['Sulfate (SO4)']
+    sites = processed_df['Site']
+    
+    # Color adit sites differently (check for NaN/strings safely)
+    colors = [
+        '#d62728' if ('Hard' in site) or ('SPENCE' in site) 
+        else '#1f77b4' 
+        for site in sites
+    ]
+    
+    # Plot
+    plt.scatter(x, y, c=colors, s=100, edgecolor='k', alpha=0.8)
+    
+    # Labels and annotations
+    plt.xlabel('pH', fontsize=12)
+    plt.ylabel('Sulfate (mg/L)', fontsize=12)
+    plt.title('pH vs. Sulfate: Neutral Mine Drainage Signatures', fontsize=14)
+    plt.grid(alpha=0.3)
+    
+    # Add reference text
+    plt.text(7.5, 20, 'High sulfate ⇨ Active sulfide weathering\n'
+             'Neutral pH ⇨ Carbonate buffering', 
+             bbox=dict(facecolor='white', alpha=0.9))
+    
+    # Legend
+    plt.scatter([], [], c='#d62728', edgecolor='k', label='Adit Discharges')
+    plt.scatter([], [], c='#1f77b4', edgecolor='k', label='Other Sites')
+    plt.legend(frameon=True, loc='upper left')
+    
+    plt.tight_layout()
+    plt.savefig(f"{output_dir}/ph_vs_sulfate_scatter.png", dpi=300)
+    plt.close()
+
 # Run all plots
 def main():
     plot_metal_barplots(summary_df, results_df)
     plot_exceedance_heatmap(results_df)
-
-if __name__ == '__main__':
-    main()
-def main():
-    plot_metal_barplots(summary_df, results_df)
-    plot_exceedance_heatmap(results_df)
+    plot_ph_vs_sulfate(processed_df)
 
 if __name__ == '__main__':
     main()

@@ -1,0 +1,11 @@
+Zinc Analysis
+========================================
+Initial Concentration: 590.0 µg/L
+Decay Rate: 0.4 km⁻¹
+AA-EQS: 10.9 µg/L
+MAC-EQS: nan µg/L
+
+Monte Carlo Results:
+- Median concentration: 0.0 µg/L
+- Exceedance probability: 0.0%
+- Median persistence distance: 5.7 km
